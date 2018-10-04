@@ -75,7 +75,7 @@ func run(args []string) error {
 
 	go interrupt(apiListener)
 
-	log.Println("launching cache proxy")
+	log.Printf("launching cache proxy on port: %s", *port)
 	log.Fatalf("http server error: %s", http.Serve(apiListener, mux))
 
 	return nil
