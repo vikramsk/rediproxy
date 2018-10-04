@@ -1,0 +1,16 @@
+version: "3"
+services: 
+  rediproxy: 
+    build: 
+      context: "."
+    command: rediproxy
+    links: 
+      - redisdb
+    ports: 
+      - "8080:8080"
+    command: --redis-url=redisdb:6379
+  redisdb: 
+    image: redis
+    ports: 
+    - "6379:6379"
+
