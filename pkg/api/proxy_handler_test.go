@@ -29,7 +29,7 @@ func internalError(key string) (string, error) {
 	return "", errors.New("internal error")
 }
 
-func TestInvalidRequest(t *testing.T) {
+func TestAPIHandler(t *testing.T) {
 	scenarios := []scenario{
 		{
 			name:           "invalid request route should return not found",
