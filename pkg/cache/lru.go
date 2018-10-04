@@ -22,6 +22,11 @@ import (
 // front will at least be 3 min.
 const defaultWindowPercent = 0.05
 
+// defaultSampleSize is used to randomly pick
+// elements from the cache and evict them if
+// they have expired.
+const defaultSampleSize = 20
+
 // item represents a single cache
 // entry for an LRU cache.
 type item struct {
@@ -73,13 +78,15 @@ type lruCache struct {
 // for the objects in the cache.
 func NewLRUCache(c int, t time.Duration) Cacher {
 	tw := time.Duration(int(defaultWindowPercent * float64(t)))
-	return &lruCache{
+	lc := &lruCache{
 		capacity:    c,
 		ttl:         t,
 		timeWindow:  tw,
 		lookupTable: make(map[string]*item, c),
 		list:        list.New(),
 	}
+	go lc.runCleanup()
+	return lc
 }
 
 // Get looks up the key in the in-memory LRU cache.
@@ -104,10 +111,9 @@ func (lc *lruCache) Get(key string) (string, error) {
 // that it adheres to the constraints on the capacity.
 func (lc *lruCache) Set(k, v string) {
 	i := &item{
-		key:     k,
-		movedAt: time.Now().UTC(),
-		value:   v,
-		expiry:  time.Now().UTC().Add(lc.ttl),
+		key: k, movedAt: time.Now().UTC(),
+		value:  v,
+		expiry: time.Now().UTC().Add(lc.ttl),
 	}
 
 	lc.Lock()
@@ -171,8 +177,12 @@ func (lc *lruCache) isFull() bool {
 func (lc *lruCache) removeItem(i *item) {
 	lc.Lock()
 	defer lc.Unlock()
+	if i.element == nil {
+		return
+	}
 	lc.list.Remove(i.element)
 	delete(lc.lookupTable, i.key)
+	i.element = nil
 
 }
 
@@ -181,8 +191,67 @@ func (lc *lruCache) removeItem(i *item) {
 func (lc *lruCache) moveItemFront(i *item) {
 	lc.Lock()
 	defer lc.Unlock()
+	if i.element == nil {
+		return
+	}
 	lc.list.Remove(i.element)
 	i.movedAt = time.Now().UTC()
 	elem := lc.list.PushFront(i)
 	i.element = elem
+}
+
+// runCleanup is a background worker that picks
+// up random keys from the cache and checks if
+// they have expired. It runs the removeStaleData
+// func 10 times in 1 second.
+// This is inspired by the Redis EXPIRE strategy.
+// https://redis.io/commands/expire#how-redis-expires-keys
+func (lc *lruCache) runCleanup() {
+	var keys map[string]struct{}
+	for {
+		if len(keys) <= 0.75*defaultSampleSize {
+			keys = lc.getRandomKeys(defaultSampleSize)
+		}
+		lc.removeStaleData(keys)
+		time.Sleep(time.Duration(1e9 / 10))
+	}
+}
+
+// removeStaleData iterates through the provided keys
+// and removed any expired items from the cache.
+func (lc *lruCache) removeStaleData(keys map[string]struct{}) {
+	for k, _ := range keys {
+		it, _, del, err := lc.searchItem(k)
+		// key has already been deleted
+		if err != nil {
+			delete(keys, k)
+			continue
+		}
+		if del {
+			delete(keys, k)
+			lc.removeItem(it)
+		}
+	}
+}
+
+// getRandomKeys fetches random keys from the lookupTable
+// equal to the count passed as input. It returns a slice.
+// Note that this is randomness isn't truly random as
+// the go runtime doesn't make any guarantees on the
+// order of the traversal of a map.
+func (lc *lruCache) getRandomKeys(s int) map[string]struct{} {
+	lc.RLock()
+	defer lc.RUnlock()
+
+	keys := make(map[string]struct{}, s)
+	count := 0
+	for k, _ := range lc.lookupTable {
+		keys[k] = struct{}{}
+		count++
+		if count == s {
+			break
+		}
+	}
+
+	return keys
 }

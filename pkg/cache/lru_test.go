@@ -76,3 +76,19 @@ func TestLazyKeyPromotion(t *testing.T) {
 		t.Fatalf("expected oldest value to be evicted")
 	}
 }
+
+func TestStaleDataCleanup(t *testing.T) {
+	lc := NewLRUCache(100, time.Millisecond*1)
+	for i := 0; i < 50; i++ {
+		lc.Set(key(i), value(i))
+	}
+
+	time.Sleep(time.Second * 1)
+	c := lc.(*lruCache)
+	c.RLock()
+	defer c.RUnlock()
+
+	if len(c.lookupTable) == 50 {
+		t.Fatalf("expected background worker to have cleaned up expired resource")
+	}
+}
