@@ -89,12 +89,13 @@ func (lc *lruCache) Get(key string) (string, error) {
 	it, move, del, err := lc.searchItem(key)
 	if err != nil {
 		return "", err
+	} else if del {
+		lc.removeItem(it)
+		return "", ErrKeyNotFound
 	}
 
 	if move {
 		lc.moveItemFront(it)
-	} else if del {
-		lc.removeItem(it)
 	}
 	return it.value, nil
 }
@@ -103,17 +104,21 @@ func (lc *lruCache) Get(key string) (string, error) {
 // that it adheres to the constraints on the capacity.
 func (lc *lruCache) Set(k, v string) {
 	i := &item{
-		key:    k,
-		value:  v,
-		expiry: time.Now().UTC().Add(lc.ttl),
+		key:     k,
+		movedAt: time.Now().UTC(),
+		value:   v,
+		expiry:  time.Now().UTC().Add(lc.ttl),
 	}
 
 	lc.Lock()
 	defer lc.Unlock()
 
 	if lc.isFull() {
+		it := lc.list.Back().Value.(*item)
+		delete(lc.lookupTable, it.key)
 		lc.list.Remove(lc.list.Back())
 	}
+
 	elem := lc.list.PushFront(i)
 	i.element = elem
 
@@ -141,7 +146,7 @@ func (lc *lruCache) searchItem(key string) (*item, bool, bool, error) {
 
 	// check if item has expired
 	if it.expiry.Sub(now) < 0 {
-		return nil, false, true, nil
+		return it, false, true, nil
 	}
 
 	// check if item needs to be moved
@@ -155,7 +160,7 @@ func (lc *lruCache) searchItem(key string) (*item, bool, bool, error) {
 // isFull checks if the lru cache has
 // hit the capacity.
 func (lc *lruCache) isFull() bool {
-	if len(lc.lookupTable) >= lc.capacity {
+	if len(lc.lookupTable) == lc.capacity {
 		return true
 	}
 	return false
@@ -177,6 +182,7 @@ func (lc *lruCache) moveItemFront(i *item) {
 	lc.Lock()
 	defer lc.Unlock()
 	lc.list.Remove(i.element)
+	i.movedAt = time.Now().UTC()
 	elem := lc.list.PushFront(i)
 	i.element = elem
 }
