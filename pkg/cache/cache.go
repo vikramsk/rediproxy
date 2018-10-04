@@ -5,19 +5,19 @@ import "errors"
 // Cacher defines the interface for a generic
 // cache that supports both reads and writes.
 type Cacher interface {
-	CacheReader
-	CacheWriter
+	Getter
+	Setter
 }
 
-// CacheReader defines the behavior for a
+// Getter defines the behavior for a
 // read-only store.
-type CacheReader interface {
+type Getter interface {
 	Get(key string) (string, error)
 }
 
-// CacheWriter defines the behavior for a
+// Setter defines the behavior for a
 // write-only store.
-type CacheWriter interface {
+type Setter interface {
 	Set(key, value string)
 }
 
