@@ -1,9 +1,18 @@
-version: "3"
-services: 
+version: "3.4"
+services:
+  tests:
+    build:
+      context: "."
+      dockerfile: Dockerfile-tests
+      target: tests
+    links: 
+      - redisdb
+    command: --redis-url=redisdb:6379
   rediproxy: 
     build: 
       context: "."
-    command: rediproxy
+      dockerfile: Dockerfile
+      target: release
     links: 
       - redisdb
     ports: 
@@ -13,4 +22,3 @@ services:
     image: redis
     ports: 
     - "6379:6379"
-

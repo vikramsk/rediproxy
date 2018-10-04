@@ -1,0 +1,8 @@
+FROM golang:1.10.4-alpine3.8 as src
+
+COPY . $GOPATH/src/github.com/vikramsk/rediproxy
+WORKDIR $GOPATH/src/github.com/vikramsk/rediproxy
+
+# Testing Pipeline
+FROM src as tests
+ENTRYPOINT ["./hack/test.sh"]
