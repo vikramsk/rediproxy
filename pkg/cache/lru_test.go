@@ -15,7 +15,13 @@ func value(i int) string {
 }
 
 func TestGetOldest_EvictOldest(t *testing.T) {
-	c := NewLRUCache(100, time.Millisecond*1)
+	lc := NewLRUCache(100, time.Minute*1)
+
+	// this is done in order to ensure that
+	// we skip the lazy promotion flow.
+	c := lc.(*lruCache)
+	c.timeWindow = 0
+
 	for i := 0; i < 100; i++ {
 		c.Set(key(i), value(i))
 	}
@@ -45,7 +51,8 @@ func TestKeyExpiry(t *testing.T) {
 	time.Sleep(time.Millisecond * 1)
 
 	// key0 being the first key that was added,
-	// should still exist in the cache.
+	// should still exist in the cache, but not
+	// returned because it has expired.
 	val, err := c.Get(key(0))
 	if val != "" || err != ErrKeyNotFound {
 		t.Fatalf("expected key to be deleted after expiry")
