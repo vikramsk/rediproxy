@@ -111,9 +111,10 @@ func (lc *lruCache) Get(key string) (string, error) {
 // that it adheres to the constraints on the capacity.
 func (lc *lruCache) Set(k, v string) {
 	i := &item{
-		key: k, movedAt: time.Now().UTC(),
-		value:  v,
-		expiry: time.Now().UTC().Add(lc.ttl),
+		key:     k,
+		value:   v,
+		movedAt: time.Now().UTC(),
+		expiry:  time.Now().UTC().Add(lc.ttl),
 	}
 
 	lc.Lock()

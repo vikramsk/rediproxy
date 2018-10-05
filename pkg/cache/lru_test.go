@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -91,4 +92,69 @@ func TestStaleDataCleanup(t *testing.T) {
 	if len(c.lookupTable) == 50 {
 		t.Fatalf("expected background worker to have cleaned up expired resource")
 	}
+}
+
+func BenchmarkLRURandom(b *testing.B) {
+	lc := NewLRUCache(8192, time.Hour*1)
+
+	trace := make([]string, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		trace[i] = key(rand.Int() % 32768)
+	}
+
+	b.ResetTimer()
+
+	var hit, miss int
+	for i := 0; i < 2*b.N; i++ {
+		if i%2 == 0 {
+			lc.Set(trace[i], trace[i])
+		} else {
+			_, err := lc.Get(trace[i])
+			if err != nil {
+				miss++
+			} else {
+				hit++
+			}
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(miss))
+}
+
+// Frequent benchmark works by frequently
+func BenchmarkLRUFrequent(b *testing.B) {
+	lc := NewLRUCache(8192, time.Hour*1)
+
+	unique := make(map[string]struct{}, 0)
+	trace := make([]int, b.N*2)
+	for i := 0; i < b.N*2; i++ {
+		if i%2 == 0 {
+			trace[i] = rand.Int() % 32768
+		} else {
+			trace[i] = rand.Int()
+		}
+	}
+
+	for i := 0; i < b.N; i++ {
+		if trace[i] <= 32768 {
+			k := key(trace[i])
+			if _, ok := unique[k]; !ok {
+				unique[k] = struct{}{}
+			} else {
+				lc.Set(k, k)
+			}
+		}
+	}
+
+	b.ResetTimer()
+
+	var hit, miss int
+	for i := 0; i < b.N; i++ {
+		_, err := lc.Get(key(trace[i]))
+		if err != nil {
+			miss++
+		} else {
+			hit++
+		}
+	}
+	b.Logf("hit: %d miss: %d ratio: %f", hit, miss, float64(hit)/float64(miss))
 }
