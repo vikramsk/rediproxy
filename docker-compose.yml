@@ -6,8 +6,8 @@ services:
       dockerfile: Dockerfile-tests
       target: tests
     links: 
-      - redisdb
-    command: --redis-url=redisdb:6379
+      - rediproxy
+    command: --redis-url=redisdb:6379 --proxy-url=rediproxy:8080
   rediproxy: 
     build: 
       context: "."

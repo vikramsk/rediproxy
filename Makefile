@@ -4,7 +4,7 @@ verify:
 
 .PHONY: tests
 tests:
-	docker-compose build tests && docker-compose run tests
+	docker-compose build tests && docker-compose build rediproxy && docker-compose run tests
 
 .PHONY: run
 run:
