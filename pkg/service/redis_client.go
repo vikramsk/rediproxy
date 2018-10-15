@@ -33,6 +33,9 @@ func NewRedisClient(addr string) (cache.Getter, error) {
 func (rc *redisClient) Get(key string) (string, error) {
 	cmd := rc.client.Get(key)
 	if cmd.Err() != nil {
+		if cmd.Err() == redis.Nil {
+			return "", cache.ErrKeyNotFound
+		}
 		return "", fmt.Errorf("service: error while reading key %s, err: %v", key, cmd.Err())
 	}
 
